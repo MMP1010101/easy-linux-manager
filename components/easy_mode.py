@@ -11,7 +11,7 @@ from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
                            QListWidget, QListWidgetItem, QPushButton, 
                            QInputDialog, QMessageBox, QSplitter,
                            QFrame, QTextEdit, QScrollArea, QStackedWidget,
-                           QSizePolicy)
+                           QSizePolicy, QLineEdit)
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QFont, QIcon, QPixmap
 
@@ -507,34 +507,375 @@ class FileExplorerWidget(QWidget):
 
 
 class ScriptsWidget(QWidget):
-    """Widget para la sección Scripts"""
+    """Widget para la sección Scripts - Permite ejecutar scripts de la carpeta scripts"""
+    
+    # Señal para actualizar el terminal con la salida del script
+    script_output_ready = pyqtSignal(str, str)
     
     def __init__(self, theme_manager, current_theme, parent=None):
         super().__init__(parent)
         self.theme_manager = theme_manager
         self.current_theme = current_theme
+        self.scripts_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "scripts")
         self.setup_ui()
+        self.load_scripts()
     
     def setup_ui(self):
         """Crear la interfaz de Scripts"""
         self.setObjectName("modeWidget")
         
+        # Layout principal
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(50, 50, 50, 50)
+        layout.setContentsMargins(30, 30, 30, 30)
+        layout.setSpacing(20)
         
-        title = QLabel("📜 SCRIPTS")
+        # Título con estilo mejorado
+        title_frame = QFrame()
+        title_frame.setObjectName("titleFrame")
+        title_layout = QVBoxLayout(title_frame)
+        title_layout.setContentsMargins(20, 15, 20, 15)
+        
+        title = QLabel("📜 EJECUTOR DE SCRIPTS")
         title.setObjectName("easyTitle")
         title.setFont(QFont("Roboto", 18, QFont.Weight.Bold))
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(title)
+        title_layout.addWidget(title)
         
-        info = QLabel("Funcionalidad de Scripts estará disponible próximamente...")
-        info.setObjectName("modeInfo")
-        info.setFont(QFont("Roboto", 14, QFont.Weight.Normal))
-        info.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(info)
+        subtitle = QLabel("Selecciona y ejecuta los scripts disponibles en el sistema")
+        subtitle.setObjectName("subtitle")
+        subtitle.setFont(QFont("Roboto", 12, QFont.Weight.Normal))
+        subtitle.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        subtitle.setStyleSheet(f"color: {self.theme_manager.get_theme(self.current_theme)['status_fg']}; margin-top: 5px;")
+        title_layout.addWidget(subtitle)
         
-        layout.addStretch()
+        layout.addWidget(title_frame)
+        
+        # Contenedor principal dividido
+        content_splitter = QSplitter(Qt.Orientation.Horizontal)
+        content_splitter.setChildrenCollapsible(False)
+        
+        # Panel de lista de scripts
+        scripts_panel = QFrame()
+        scripts_panel.setObjectName("scriptsPanel")
+        scripts_layout = QVBoxLayout(scripts_panel)
+        scripts_layout.setContentsMargins(15, 15, 15, 15)
+        
+        # Título de la lista
+        list_title = QLabel("🧩 Scripts Disponibles")
+        list_title.setFont(QFont("Roboto", 14, QFont.Weight.Bold))
+        list_title.setObjectName("sectionTitle")
+        scripts_layout.addWidget(list_title)
+        
+        # Lista de scripts
+        self.scripts_list = QListWidget()
+        self.scripts_list.setObjectName("scriptsList")
+        self.scripts_list.setFont(QFont("JetBrains Mono", 12))
+        self.scripts_list.itemClicked.connect(self.on_script_selected)
+        scripts_layout.addWidget(self.scripts_list)
+        
+        # Botones de acción
+        buttons_layout = QHBoxLayout()
+        buttons_layout.setSpacing(15)
+        
+        self.refresh_button = QPushButton("🔄 Refrescar")
+        self.refresh_button.setObjectName("actionButton")
+        self.refresh_button.setFont(QFont("Roboto", 12, QFont.Weight.Bold))
+        self.refresh_button.clicked.connect(self.load_scripts)
+        buttons_layout.addWidget(self.refresh_button)
+        
+        self.execute_button = QPushButton("▶️ Ejecutar")
+        self.execute_button.setObjectName("primaryButton")
+        self.execute_button.setFont(QFont("Roboto", 12, QFont.Weight.Bold))
+        self.execute_button.clicked.connect(self.execute_selected_script)
+        self.execute_button.setEnabled(False)
+        buttons_layout.addWidget(self.execute_button)
+        
+        scripts_layout.addLayout(buttons_layout)
+        
+        # Agregar panel de scripts al splitter
+        content_splitter.addWidget(scripts_panel)
+        
+        # Panel de información y salida del script
+        info_panel = QFrame()
+        info_panel.setObjectName("infoPanel")
+        info_layout = QVBoxLayout(info_panel)
+        info_layout.setContentsMargins(15, 15, 15, 15)
+        
+        # Título del panel de información
+        info_title = QLabel("📋 Información del Script")
+        info_title.setFont(QFont("Roboto", 14, QFont.Weight.Bold))
+        info_title.setObjectName("sectionTitle")
+        info_layout.addWidget(info_title)
+        
+        # Información del script
+        self.script_info = QLabel("Selecciona un script para ver su información.")
+        self.script_info.setFont(QFont("JetBrains Mono", 12))
+        self.script_info.setObjectName("scriptInfo")
+        self.script_info.setWordWrap(True)
+        info_layout.addWidget(self.script_info)
+        
+        # Título del panel de salida
+        output_title = QLabel("📤 Salida del Script")
+        output_title.setFont(QFont("Roboto", 14, QFont.Weight.Bold))
+        output_title.setObjectName("sectionTitle")
+        output_title.setContentsMargins(0, 15, 0, 0)
+        info_layout.addWidget(output_title)
+        
+        # Salida del script
+        self.output_area = QTextEdit()
+        self.output_area.setObjectName("outputArea")
+        self.output_area.setFont(QFont("JetBrains Mono", 12))
+        self.output_area.setReadOnly(True)
+        self.output_area.setMinimumHeight(200)
+        info_layout.addWidget(self.output_area)
+        
+        # Agregar panel de información al splitter
+        content_splitter.addWidget(info_panel)
+        
+        # Establecer tamaños relativos de los paneles (40% lista, 60% info)
+        content_splitter.setSizes([400, 600])
+        
+        # Agregar splitter al layout principal
+        layout.addWidget(content_splitter)
+        
+        # Aplicar estilos según el tema
+        self.apply_theme()
+    
+    def apply_theme(self):
+        """Aplicar estilos según el tema seleccionado"""
+        theme = self.theme_manager.get_theme(self.current_theme)
+        
+        # Estilos para el panel de scripts
+        self.setStyleSheet(f"""
+            #modeWidget {{
+                background-color: {theme['bg']};
+                color: {theme['fg']};
+            }}
+            #titleFrame, #scriptsPanel, #infoPanel {{
+                background-color: {theme['terminal_bg']};
+                color: {theme['fg']};
+                border-radius: 10px;
+                border: 1px solid {theme['border_color']};
+            }}
+            #easyTitle {{
+                color: {theme['accent']};
+            }}
+            #scriptsList {{
+                background-color: {theme['terminal_bg']};
+                color: {theme['fg']};
+                border-radius: 5px;
+                padding: 10px;
+                border: 1px solid {theme['border_color']};
+            }}
+            #scriptsList::item {{
+                padding: 8px;
+                border-bottom: 1px solid {theme['border_color']};
+            }}
+            #scriptsList::item:selected {{
+                background-color: {theme['selection_bg']};
+                color: {theme['text']};
+            }}
+            #outputArea {{
+                background-color: {theme['terminal_bg']};
+                color: {theme['fg']};
+                border-radius: 5px;
+                padding: 10px;
+                border: 1px solid {theme['border_color']};
+            }}
+            #actionButton, #primaryButton {{
+                padding: 10px;
+                border-radius: 5px;
+                font-weight: bold;
+            }}
+            #actionButton {{
+                background-color: {theme['button_bg']};
+                color: {theme['button_fg']};
+                border: 1px solid {theme['border_color']};
+            }}
+            #actionButton:hover {{
+                background-color: {theme['button_grad_2']};
+            }}
+            #primaryButton {{
+                background-color: {theme['accent']};
+                color: {theme['button_fg']};
+            }}
+            #primaryButton:hover {{
+                background-color: {theme['button_grad_1']};
+            }}
+            #primaryButton:disabled {{
+                background-color: #555555;
+                color: #aaaaaa;
+            }}
+        """)
+    
+    def load_scripts(self):
+        """Cargar la lista de scripts disponibles"""
+        # Limpiar lista
+        self.scripts_list.clear()
+        self.output_area.clear()
+        self.script_info.setText("Selecciona un script para ver su información.")
+        self.execute_button.setEnabled(False)
+        
+        # Verificar si el directorio existe
+        if not os.path.exists(self.scripts_path):
+            try:
+                os.makedirs(self.scripts_path)
+                self.scripts_list.addItem("¡No hay scripts disponibles!")
+                return
+            except Exception as e:
+                self.scripts_list.addItem(f"Error: No se pudo crear el directorio de scripts: {e}")
+                return
+        
+        # Listar scripts
+        try:
+            scripts = [f for f in os.listdir(self.scripts_path) if os.path.isfile(os.path.join(self.scripts_path, f)) and f.endswith(".sh")]
+            
+            if not scripts:
+                self.scripts_list.addItem("¡No hay scripts disponibles!")
+                return
+            
+            # Agregar scripts a la lista
+            for script in sorted(scripts):
+                item = QListWidgetItem(f"📜 {script}")
+                item.script_path = os.path.join(self.scripts_path, script)
+                self.scripts_list.addItem(item)
+            
+        except Exception as e:
+            self.scripts_list.addItem(f"Error: {str(e)}")
+    
+    def on_script_selected(self, item):
+        """Cuando se selecciona un script de la lista"""
+        if hasattr(item, 'script_path') and os.path.exists(item.script_path):
+            # Mostrar información del script
+            try:
+                script_name = os.path.basename(item.script_path)
+                script_size = os.path.getsize(item.script_path)
+                script_size_str = self._format_size(script_size)
+                
+                # Leer las primeras líneas del script para mostrar descripción
+                with open(item.script_path, 'r') as f:
+                    lines = [line.strip() for line in f.readlines()[:10]]
+                
+                # Buscar descripción o comentarios en las primeras líneas
+                description = "Sin descripción disponible"
+                for line in lines:
+                    if line.startswith('#') and len(line) > 2:
+                        description = line[1:].strip()
+                        break
+                
+                info_text = f"""<b>Nombre:</b> {script_name}
+<b>Ruta:</b> {item.script_path}
+<b>Tamaño:</b> {script_size_str}
+<b>Descripción:</b> {description}
+
+<i>Haz clic en 'Ejecutar' para iniciar este script.</i>"""
+                
+                self.script_info.setText(info_text)
+                self.execute_button.setEnabled(True)
+            except Exception as e:
+                self.script_info.setText(f"Error al leer información del script: {str(e)}")
+                self.execute_button.setEnabled(False)
+        else:
+            self.script_info.setText("Información no disponible para este elemento.")
+            self.execute_button.setEnabled(False)
+    
+    def _format_size(self, size):
+        """Formatear tamaño de archivo para mostrar"""
+        if size < 1024:
+            return f"{size} bytes"
+        elif size < 1024 * 1024:
+            return f"{size / 1024:.1f} KB"
+        else:
+            return f"{size / (1024 * 1024):.1f} MB"
+    
+    def execute_selected_script(self):
+        """Ejecutar el script seleccionado"""
+        selected_items = self.scripts_list.selectedItems()
+        if not selected_items:
+            return
+        
+        item = selected_items[0]
+        if not hasattr(item, 'script_path'):
+            return
+        
+        script_path = item.script_path
+        if not os.path.exists(script_path):
+            self.output_area.setText("Error: El script seleccionado no existe.")
+            return
+        
+        # Verificar permisos de ejecución
+        if not os.access(script_path, os.X_OK):
+            try:
+                # Intenta dar permisos de ejecución
+                os.chmod(script_path, os.stat(script_path).st_mode | 0o111)
+                self.output_area.append("Se han dado permisos de ejecución al script.\n")
+            except Exception as e:
+                self.output_area.setText(f"Error: No se pueden establecer permisos de ejecución: {str(e)}")
+                return
+        
+        # Verificar si el script usa sudo (comprobando el contenido)
+        requires_sudo = False
+        try:
+            with open(script_path, 'r') as f:
+                content = f.read()
+                if 'sudo ' in content:
+                    requires_sudo = True
+        except:
+            pass
+        
+        # Si requiere sudo, solicitar contraseña
+        if requires_sudo:
+            password, ok = QInputDialog.getText(
+                self, 
+                "Contraseña requerida", 
+                "Este script requiere permisos de superusuario.\nIngresa tu contraseña:",
+                QLineEdit.EchoMode.Password
+            )
+            
+            if not ok or not password:
+                self.output_area.setText("Ejecución cancelada: Se requiere contraseña para ejecutar este script.")
+                return
+            
+            # Crear un script temporal para enviar la contraseña a sudo
+            self.output_area.clear()
+            self.output_area.append(f"⏳ Ejecutando: {os.path.basename(script_path)} con permisos de superusuario...\n")
+            
+            # Crear y ejecutar el runner con contraseña
+            from core.command_runner import CommandRunner
+            # Ejecutar con echo y pipe para enviar la contraseña
+            self.runner = CommandRunner(f"echo '{password}' | sudo -S {script_path}")
+            self.runner.output_ready.connect(self.handle_script_output)
+            self.runner.finished_execution.connect(self.handle_script_finished)
+            self.runner.start()
+        else:
+            # Limpiar área de salida
+            self.output_area.clear()
+            self.output_area.append(f"⏳ Ejecutando: {os.path.basename(script_path)}...\n")
+            
+            # Crear y ejecutar el runner
+            from core.command_runner import CommandRunner
+            self.runner = CommandRunner(script_path)
+            self.runner.output_ready.connect(self.handle_script_output)
+            self.runner.finished_execution.connect(self.handle_script_finished)
+            self.runner.start()
+    
+    def handle_script_output(self, text, output_type):
+        """Manejar la salida del script en ejecución"""
+        if output_type == "error":
+            self.output_area.append(f"<span style='color:red;'>{text}</span>")
+        elif output_type == "success":
+            self.output_area.append(f"<span style='color:#00cc00;'>{text}</span>")
+        else:
+            self.output_area.append(text)
+        
+        # Auto-scroll
+        cursor = self.output_area.textCursor()
+        cursor.movePosition(cursor.MoveOperation.End)
+        self.output_area.setTextCursor(cursor)
+    
+    def handle_script_finished(self):
+        """Cuando el script termina de ejecutarse"""
+        self.output_area.append("\n✅ Ejecución completada.")
 
 
 class PlayWidget(QWidget):
