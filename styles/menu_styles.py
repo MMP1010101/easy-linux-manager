@@ -50,7 +50,6 @@ def get_menu_styles(theme):
         padding: 0px;
         margin: 0px;
         border-radius: 15px;
-        box-shadow: 0px 5px 15px rgba(0, 0, 0, 0.1);
     }}
     
     /* Títulos del menú */
@@ -83,20 +82,14 @@ def get_menu_styles(theme):
         padding: 12px 20px;
         font-weight: bold;
         font-size: 16px;
-        box-shadow: 0px 5px 15px rgba(0,0,0,0.2);
-        transition: all 0.2s ease;
     }}
     
     QPushButton#backButton:hover {{
         background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 {theme['accent']}, stop:1 #8B66E5);
-        box-shadow: 0px 6px 15px rgba(0, 0, 0, 0.2);
-        transform: translateY(-2px) scale(1.02);
     }}
     
     QPushButton#backButton:pressed {{
         background: {theme['selection_bg']};
-        box-shadow: 0px 2px 5px rgba(0, 0, 0, 0.1);
-        transform: translateY(1px);
     }}
     """
 
@@ -215,6 +208,14 @@ def get_general_menu_styles(theme):
         opacity: 200;
         font-weight: bold;
     }}
+    
+    /* Estilo para mensajes de estado */
+    QStatusBar {{
+        background-color: {theme['bg']};
+        color: {theme['text']};
+        border-top: 1px solid {theme['border_color']};
+    }}
+
     
     /* Estilo para mensajes de estado */
     QStatusBar {{

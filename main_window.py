@@ -8,10 +8,11 @@ from PyQt6.QtWidgets import (
     QLabel, QPushButton, QComboBox, QStackedWidget
 )
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QFont
+from PyQt6.QtGui import QFont, QKeySequence, QShortcut
 
 from styles import ThemeManager, get_general_menu_styles, get_menu_styles
-from components import MenuWidget, TerminalWidget, EasyWidget, DependenciesWidget
+from components import MenuWidget, TerminalWidget, EasyWidget, DependenciesWidget, FileExplorerWidget
+from components.easy_mode import ScriptsWidget, PlayWidget
 
 
 class MainWindow(QMainWindow):
@@ -20,7 +21,16 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("🐧 Linux GUI - Interfaz Épica PyQt6")
-        self.setGeometry(100, 100, 1200, 800)
+        
+        # Configurar ventana redimensionable
+        self.setMinimumSize(800, 600)  # Tamaño mínimo
+        self.resize(1200, 800)  # Tamaño inicial
+        
+        # Permitir maximizar y redimensionar
+        self.setWindowFlags(Qt.WindowType.Window | 
+                           Qt.WindowType.WindowMinimizeButtonHint |
+                           Qt.WindowType.WindowMaximizeButtonHint |
+                           Qt.WindowType.WindowCloseButtonHint)
         
         # Configuración de temas
         self.theme_manager = ThemeManager()
@@ -62,6 +72,9 @@ class MainWindow(QMainWindow):
         self.stacked_widget.addWidget(self.menu_page)
         self.stacked_widget.addWidget(self.terminal_page)
         self.stacked_widget.addWidget(self.easy_page)
+        self.stacked_widget.addWidget(self.easy_files_page)
+        self.stacked_widget.addWidget(self.easy_scripts_page)
+        self.stacked_widget.addWidget(self.easy_play_page)
         self.stacked_widget.addWidget(self.dependencies_page)
         
         # Barra superior con tema
@@ -81,8 +94,13 @@ class MainWindow(QMainWindow):
         # Página del terminal
         self.terminal_page = TerminalWidget(self.theme_manager, self.current_theme, self)
         
-        # Página Easy Mode
+        # Página Easy Mode (menú principal del Easy Mode)
         self.easy_page = EasyWidget(self.theme_manager, self.current_theme, self)
+        
+        # Páginas específicas del Easy Mode
+        self.easy_files_page = FileExplorerWidget(self.theme_manager, self.current_theme, None, self)
+        self.easy_scripts_page = ScriptsWidget(self.theme_manager, self.current_theme, self)
+        self.easy_play_page = PlayWidget(self.theme_manager, self.current_theme, self)
         
         # Página Dependencies
         self.dependencies_page = DependenciesWidget(self.theme_manager, self.current_theme, self)
@@ -126,6 +144,28 @@ class MainWindow(QMainWindow):
         self.back_button.setVisible(True)
         self.setWindowTitle("🐧 Linux GUI - Easy Mode")
     
+    def show_easy_files(self):
+        """Mostrar el explorador de archivos del Easy Mode"""
+        self.stacked_widget.setCurrentWidget(self.easy_files_page)
+        self.back_button.setVisible(True)
+        self.setWindowTitle("🐧 Linux GUI - Files")
+    
+    def show_easy_scripts(self):
+        """Mostrar la sección de scripts del Easy Mode"""
+        self.stacked_widget.setCurrentWidget(self.easy_scripts_page)
+        self.back_button.setVisible(True)
+        self.setWindowTitle("🐧 Linux GUI - Scripts")
+    
+    def show_easy_play(self):
+        """Mostrar la sección de juegos del Easy Mode"""
+        self.stacked_widget.setCurrentWidget(self.easy_play_page)
+        self.back_button.setVisible(True)
+        self.setWindowTitle("🐧 Linux GUI - Play")
+    
+    def show_menu(self):
+        """Mostrar el menú principal (usado por el botón regresar en Easy Mode)"""
+        self.go_back_to_menu()
+    
     def show_dependencies(self):
         """Mostrar página Install Dependencies"""
         self.stacked_widget.setCurrentWidget(self.dependencies_page)
@@ -145,6 +185,19 @@ class MainWindow(QMainWindow):
         # Cambiar tema en todas las páginas
         self.terminal_page.change_theme(theme_name)
         self.easy_page.change_theme(theme_name)
+        
+        # Cambiar tema en las páginas específicas del Easy Mode
+        if hasattr(self.easy_files_page, 'change_theme'):
+            self.easy_files_page.change_theme(theme_name)
+        
+        if hasattr(self.easy_scripts_page, 'theme_manager'):
+            self.easy_scripts_page.theme_manager = self.theme_manager
+            self.easy_scripts_page.current_theme = theme_name
+        
+        if hasattr(self.easy_play_page, 'theme_manager'):
+            self.easy_play_page.theme_manager = self.theme_manager
+            self.easy_play_page.current_theme = theme_name
+            
         self.dependencies_page.change_theme(theme_name)
         
         # Aplicar tema general
