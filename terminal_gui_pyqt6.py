@@ -14,7 +14,8 @@ import random
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QTextEdit, QLineEdit, QPushButton, QLabel, QFrame, QComboBox,
-    QScrollArea, QMessageBox, QInputDialog, QSplitter, QStackedWidget
+    QScrollArea, QMessageBox, QInputDialog, QSplitter, QStackedWidget,
+    QSizePolicy
 )
 from PyQt6.QtCore import Qt, QTimer, QThread, pyqtSignal, QProcess
 from PyQt6.QtGui import QFont, QTextCursor, QPixmap, QPalette, QColor
@@ -277,62 +278,118 @@ class MainWindow(QMainWindow):
     def create_menu_page(self):
         """Crear página del menú principal"""
         self.menu_page = QWidget()
-        layout = QVBoxLayout(self.menu_page)
-        layout.setContentsMargins(50, 50, 50, 50)
+        layout = QHBoxLayout(self.menu_page)
+        layout.setContentsMargins(20, 20, 20, 20)
         layout.setSpacing(30)
         
-        # Título principal
-        title_label = QLabel("🐧 LINUX GUI ÉPICO")
-        title_label.setFont(self.title_font)
-        title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(title_label)
+        # Set overall darker background for the menu page
+        self.menu_page.setStyleSheet("background-color: #0d1117;")
         
-        # Subtítulo
-        subtitle_label = QLabel("Selecciona una opción:")
-        subtitle_label.setFont(self.menu_font)
-        subtitle_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(subtitle_label)
+        # Configure the layout with no spacing
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
         
-        # Espaciador
-        layout.addStretch()
+        # Área para la imagen del logo en el lado izquierdo - forzar tamaño grande
+        logo_area = QWidget()
+        logo_area.setMinimumWidth(550)  # Forzar un ancho mínimo grande
+        logo_layout = QVBoxLayout(logo_area)
+        logo_layout.setContentsMargins(0, 0, 0, 0)
+        logo_layout.setSpacing(0)
+        logo_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         
-        # Botones del menú
-        menu_buttons_layout = QVBoxLayout()
-        menu_buttons_layout.setSpacing(20)
+        # Logo (utiliza una etiqueta para mostrar la imagen)
+        eye_logo = QLabel()
+        # Llenar todo el espacio disponible
+        eye_logo.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        logo_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logo.png")
+        eye_pixmap = QPixmap(logo_path)
+        if eye_pixmap.isNull():
+            eye_logo.setText("👁️⚡")
+            eye_logo.setFont(QFont("Arial", 180, QFont.Weight.Bold))
+            eye_logo.setStyleSheet("color: white; background-color: #0d1117;")
+            print(f"⚠️ No se pudo cargar la imagen del logo desde: {logo_path}")
+        else:
+            print(f"✅ Logo cargado correctamente desde: {logo_path}")
+            # Hacer el logo MUCHO más grande (ocupando al menos la mitad del espacio)
+            eye_logo.setPixmap(eye_pixmap.scaled(780, 780, 
+                              Qt.AspectRatioMode.KeepAspectRatio, 
+                              Qt.TransformationMode.SmoothTransformation))
+            # Eliminar cualquier espacio blanco alrededor de la imagen
+            eye_logo.setStyleSheet("""
+                background-color: #0d1117; 
+                border: none;
+                padding: 0px;
+                margin: 0px;
+            """)
+        
+        eye_logo.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        logo_layout.addStretch(1)  # Espacio flexible arriba
+        logo_layout.addWidget(eye_logo)
+        logo_layout.addStretch(1)  # Espacio flexible abajo
+        
+        # Área para los botones en el lado derecho
+        buttons_area = QWidget()
+        buttons_layout = QVBoxLayout(buttons_area)
+        buttons_layout.setContentsMargins(20, 20, 20, 20)
+        buttons_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        buttons_layout.setSpacing(20)
+        
+        # Make the right side match the second image
+        buttons_area.setStyleSheet("""
+            background-color: #0d1117;
+            border: none;
+        """)
         
         # Botón Terminal
-        terminal_button = QPushButton("▶️ Terminal")
+        terminal_button = QPushButton("▶ terminal")
         terminal_button.setFont(self.menu_font)
-        terminal_button.setFixedHeight(80)
+        terminal_button.setFixedSize(400, 80)
         terminal_button.clicked.connect(self.show_terminal)
-        menu_buttons_layout.addWidget(terminal_button)
+        buttons_layout.addWidget(terminal_button)
         
         # Botón Easy
-        easy_button = QPushButton("✨ Easy")
+        easy_button = QPushButton("▶ easy")
         easy_button.setFont(self.menu_font)
-        easy_button.setFixedHeight(80)
+        easy_button.setFixedSize(400, 80)
         easy_button.clicked.connect(self.show_easy)
-        menu_buttons_layout.addWidget(easy_button)
+        buttons_layout.addWidget(easy_button)
         
         # Botón Install Dependencies
-        deps_button = QPushButton("📦 Install Dependencies")
+        deps_button = QPushButton("▶ install easy dependencies")
         deps_button.setFont(self.menu_font)
-        deps_button.setFixedHeight(80)
+        deps_button.setFixedSize(400, 80)
         deps_button.clicked.connect(self.show_dependencies)
-        menu_buttons_layout.addWidget(deps_button)
+        buttons_layout.addWidget(deps_button)
         
-        layout.addLayout(menu_buttons_layout)
-        layout.addStretch()
+        # Añadir áreas al layout principal
+        layout.addWidget(logo_area, 1)
+        layout.addWidget(buttons_area, 1)
         
-        # Info del sistema
-        info_label = QLabel(f"Sistema: {os.uname().sysname} | Usuario: {os.getenv('USER', 'usuario')}")
-        info_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(info_label)
+        # Estilo específico para los botones del menú principal
+        button_style = """
+        QPushButton {
+            background-color: #6B46C1;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            text-align: left;
+            padding-left: 20px;
+        }
+        QPushButton:hover {
+            background-color: #805AD5;
+        }
+        QPushButton:pressed {
+            background-color: #553C9A;
+        }
+        """
+        
+        terminal_button.setStyleSheet(button_style)
+        easy_button.setStyleSheet(button_style)
+        deps_button.setStyleSheet(button_style)
     
     def create_terminal_page(self):
         """Crear página del terminal (usando la clase TerminalGUI existente)"""
         self.terminal_page = TerminalWidget(self.themes, self.current_theme)
-    
     def create_easy_page(self):
         """Crear página Easy (placeholder por ahora)"""
         self.easy_page = QWidget()
@@ -448,9 +505,66 @@ class MainWindow(QMainWindow):
         QComboBox:hover {{
             border-color: {theme['accent']};
         }}
+        
+        /* Añadimos un tema oscuro específico para el fondo de la página del menú */
+        #menuPageWidget {{
+            background-color: #1a1a2e;
+        }}
         """
         
         self.setStyleSheet(style)
+        self.menu_page.setObjectName("menuPageWidget")
+        self.terminal_page.setObjectName("terminalPageWidget")
+        self.easy_page.setObjectName("easyPageWidget")
+        self.dependencies_page.setObjectName("dependenciesPageWidget")
+        self.apply_widget_theme(self.menu_page)
+        self.apply_widget_theme(self.terminal_page)
+        self.apply_widget_theme(self.easy_page)
+        self.apply_widget_theme(self.dependencies_page)
+    
+    def apply_widget_theme(self, widget):
+        """Aplicar tema a un widget específico"""
+        theme = self.themes[self.current_theme]
+        widget.setStyleSheet(f"""
+        QWidget {{
+            background-color: {theme['bg']};
+            color: {theme['text']};
+        }}
+        
+        QLabel {{
+            color: {theme['text']};
+            background-color: transparent;
+        }}
+        
+        QPushButton {{
+            background-color: {theme['button_bg']};
+            color: {theme['button_fg']};
+            border: none;
+            border-radius: 10px;
+            padding: 15px 20px;
+            font-weight: bold;
+        }}
+        
+        QPushButton:hover {{
+            background-color: {theme['accent']};
+        }}
+        
+        QPushButton:pressed {{
+            background-color: {theme['selection_bg']};
+        }}
+        
+        QComboBox {{
+            background-color: {theme['button_bg']};
+            color: {theme['button_fg']};
+            border: 2px solid {theme['border_color']};
+            border-radius: 5px;
+            padding: 5px;
+        }}
+        
+        QComboBox:hover {{
+            border-color: {theme['accent']};
+        }}
+        """)
 
 
 class TerminalWidget(QWidget):
@@ -478,7 +592,6 @@ class TerminalWidget(QWidget):
         
         # Mensaje de bienvenida
         self.show_welcome_message()
-    
     def setup_fonts(self):
         """Configurar fuentes personalizadas"""
         self.title_font = QFont("Roboto", 14, QFont.Weight.Bold)
