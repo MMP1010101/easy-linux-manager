@@ -11,7 +11,7 @@ from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
                            QListWidget, QListWidgetItem, QPushButton, 
                            QInputDialog, QMessageBox, QSplitter,
                            QFrame, QTextEdit, QScrollArea, QStackedWidget,
-                           QSizePolicy, QLineEdit)
+                           QSizePolicy, QLineEdit, QGridLayout)
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QFont, QIcon, QPixmap
 
@@ -878,35 +878,719 @@ class ScriptsWidget(QWidget):
         self.output_area.append("\n✅ Ejecución completada.")
 
 
+class AppLauncherCard(QFrame):
+    """Tarjeta para lanzar una aplicación instalada"""
+    launch_requested = pyqtSignal(dict)
+    
+    def __init__(self, app_data, theme):
+        super().__init__()
+        self.app_data = app_data
+        self.theme = theme
+        self.setup_ui()
+        
+    def setup_ui(self):
+        """Crear la interfaz de la tarjeta de launcher"""
+        self.setObjectName("launcherCard")
+        self.setFixedSize(220, 280)
+        
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(15, 15, 15, 15)
+        layout.setSpacing(10)
+        
+        # Icono de la aplicación
+        icon_label = QLabel()
+        icon_label.setObjectName("launcherIcon")
+        icon_label.setText(self.app_data['icon'])
+        icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        icon_label.setFont(QFont("Arial", 42))
+        icon_label.setFixedHeight(70)
+        layout.addWidget(icon_label)
+        
+        # Nombre de la aplicación
+        name_label = QLabel(self.app_data['name'])
+        name_label.setObjectName("launcherName")
+        name_label.setFont(QFont("Roboto", 13, QFont.Weight.Bold))
+        name_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        name_label.setWordWrap(True)
+        layout.addWidget(name_label)
+        
+        # Descripción corta
+        if 'description' in self.app_data:
+            desc_label = QLabel(self.app_data['description'])
+            desc_label.setObjectName("launcherDescription")
+            desc_label.setFont(QFont("Roboto", 9))
+            desc_label.setWordWrap(True)
+            desc_label.setMaximumHeight(45)
+            desc_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            layout.addWidget(desc_label)
+        
+        # Estado (instalado/no instalado)
+        status_label = QLabel()
+        status_label.setObjectName("launcherStatus")
+        status_label.setFont(QFont("JetBrains Mono", 8))
+        status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        
+        if self.app_data['is_installed']:
+            status_label.setText("✅ INSTALADO")
+            status_label.setStyleSheet(f"color: {self.theme['accent']};")
+        else:
+            status_label.setText("❌ NO INSTALADO")
+            status_label.setStyleSheet(f"color: {self.theme['status_fg']};")
+        
+        layout.addWidget(status_label)
+        
+        # Botón de acción
+        action_btn = QPushButton()
+        action_btn.setObjectName("launcherButton")
+        action_btn.setFont(QFont("Roboto", 11, QFont.Weight.Bold))
+        action_btn.setFixedHeight(35)
+        
+        if self.app_data['is_installed']:
+            action_btn.setText("🚀 ABRIR")
+            action_btn.clicked.connect(lambda: self.launch_requested.emit(self.app_data))
+        else:
+            action_btn.setText("📥 INSTALAR")
+            action_btn.clicked.connect(lambda: self.launch_requested.emit(self.app_data))
+        
+        layout.addWidget(action_btn)
+        
+        # Aplicar estilos
+        self.apply_styles()
+        
+    def apply_styles(self):
+        """Aplicar estilos a la tarjeta launcher"""
+        self.setStyleSheet(f"""
+            #launcherCard {{
+                background-color: {self.theme['terminal_bg']};
+                border: 2px solid {self.theme['border_color']};
+                border-radius: 12px;
+            }}
+            #launcherCard:hover {{
+                border-color: {self.theme['accent']};
+                background-color: {self.theme['bg']};
+            }}
+            #launcherName {{
+                color: {self.theme['accent']};
+            }}
+            #launcherDescription {{
+                color: {self.theme['fg']};
+            }}
+            #launcherButton {{
+                background-color: {self.theme['button_bg']};
+                color: {self.theme['button_fg']};
+                border: none;
+                border-radius: 6px;
+                padding: 6px;
+            }}
+            #launcherButton:hover {{
+                background-color: {self.theme['accent']};
+            }}
+            #launcherButton:pressed {{
+                background-color: {self.theme['button_grad_1']};
+            }}
+        """)
+
+
 class PlayWidget(QWidget):
-    """Widget para la sección Play"""
+    """Widget para el App Launcher - Abrir aplicaciones instaladas"""
     
     def __init__(self, theme_manager, current_theme, parent=None):
         super().__init__(parent)
         self.theme_manager = theme_manager
         self.current_theme = current_theme
         self.setup_ui()
+        self.scan_installed_apps()
     
     def setup_ui(self):
-        """Crear la interfaz de Play"""
+        """Crear la interfaz del App Launcher"""
         self.setObjectName("modeWidget")
         
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(50, 50, 50, 50)
+        # Layout principal
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(25, 25, 25, 25)
+        main_layout.setSpacing(20)
         
-        title = QLabel("🎮 PLAY")
+        # Título con estilo mejorado
+        title_frame = QFrame()
+        title_frame.setObjectName("titleFrame")
+        title_layout = QVBoxLayout(title_frame)
+        title_layout.setContentsMargins(20, 15, 20, 15)
+        
+        title = QLabel("🚀 APP LAUNCHER")
         title.setObjectName("easyTitle")
         title.setFont(QFont("Roboto", 18, QFont.Weight.Bold))
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(title)
+        title_layout.addWidget(title)
         
-        info = QLabel("Funcionalidad de Juegos estará disponible próximamente...")
-        info.setObjectName("modeInfo")
-        info.setFont(QFont("Roboto", 14, QFont.Weight.Normal))
-        info.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(info)
+        subtitle = QLabel("Abre tus aplicaciones favoritas con un solo clic")
+        subtitle.setObjectName("subtitle")
+        subtitle.setFont(QFont("Roboto", 12, QFont.Weight.Normal))
+        subtitle.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        subtitle.setStyleSheet(f"color: {self.theme_manager.get_theme(self.current_theme)['status_fg']}; margin-top: 5px;")
+        title_layout.addWidget(subtitle)
         
-        layout.addStretch()
+        main_layout.addWidget(title_frame)
+        
+        # Barra de acciones
+        actions_frame = QFrame()
+        actions_frame.setObjectName("actionsFrame")
+        actions_layout = QHBoxLayout(actions_frame)
+        actions_layout.setContentsMargins(15, 10, 15, 10)
+        
+        # Botón para refrescar
+        refresh_btn = QPushButton("🔄 Refrescar")
+        refresh_btn.setObjectName("actionButton")
+        refresh_btn.setFont(QFont("Roboto", 12, QFont.Weight.Bold))
+        refresh_btn.clicked.connect(self.scan_installed_apps)
+        actions_layout.addWidget(refresh_btn)
+        
+        actions_layout.addStretch()
+        
+        # Mostrar total de apps
+        self.apps_count_label = QLabel("📱 Aplicaciones encontradas: 0")
+        self.apps_count_label.setObjectName("countLabel")
+        self.apps_count_label.setFont(QFont("JetBrains Mono", 10))
+        actions_layout.addWidget(self.apps_count_label)
+        
+        main_layout.addWidget(actions_frame)
+        
+        # Filtros por categoría
+        filters_frame = QFrame()
+        filters_frame.setObjectName("filtersFrame")
+        filters_layout = QHBoxLayout(filters_frame)
+        filters_layout.setContentsMargins(15, 10, 15, 10)
+        filters_layout.setSpacing(10)
+        
+        # Variable para el filtro actual
+        self.current_filter = "Todas"
+        
+        # Botones de filtro
+        categories = ["Todas", "Internet", "Desarrollo", "Multimedia", "Comunicación", 
+                     "Sistema", "Oficina", "Juegos", "Seguridad", "Utilidades"]
+        
+        for category in categories:
+            filter_btn = QPushButton(category)
+            filter_btn.setObjectName("filterButton")
+            filter_btn.setFont(QFont("Roboto", 10, QFont.Weight.Bold))
+            filter_btn.setCheckable(True)
+            filter_btn.setChecked(category == "Todas")
+            filter_btn.clicked.connect(lambda checked, cat=category: self.set_category_filter(cat))
+            filters_layout.addWidget(filter_btn)
+        
+        filters_layout.addStretch()
+        main_layout.addWidget(filters_frame)
+        
+        # Área de aplicaciones con scroll
+        apps_scroll = QScrollArea()
+        apps_scroll.setObjectName("appsScroll")
+        apps_scroll.setWidgetResizable(True)
+        apps_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        apps_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        
+        self.apps_container = QWidget()
+        self.apps_layout = QGridLayout(self.apps_container)
+        self.apps_layout.setSpacing(15)
+        self.apps_layout.setContentsMargins(15, 15, 15, 15)
+        
+        apps_scroll.setWidget(self.apps_container)
+        main_layout.addWidget(apps_scroll)
+        
+        # Aplicar tema
+        self.apply_theme()
+    
+    def create_apps_database(self):
+        """Base de datos de aplicaciones populares con comandos de ejecución"""
+        return {
+            # Navegadores
+            "firefox": {
+                "name": "Firefox",
+                "icon": "🦊",
+                "command": "firefox",
+                "description": "Navegador web",
+                "category": "Internet"
+            },
+            "google-chrome": {
+                "name": "Google Chrome",
+                "icon": "🌐",
+                "command": "google-chrome",
+                "description": "Navegador web",
+                "category": "Internet"
+            },
+            "chromium": {
+                "name": "Chromium",
+                "icon": "🧩",
+                "command": "chromium",
+                "description": "Navegador web",
+                "category": "Internet"
+            },
+            "brave": {
+                "name": "Brave",
+                "icon": "🦁",
+                "command": "brave-browser",
+                "description": "Navegador web",
+                "category": "Internet"
+            },
+            "tor": {
+                "name": "Tor Browser",
+                "icon": "🔒",
+                "command": "torbrowser-launcher",
+                "description": "Navegación anónima",
+                "category": "Internet"
+            },
+            
+            # Editores y Desarrollo
+            "code": {
+                "name": "VS Code",
+                "icon": "💻",
+                "command": "code",
+                "description": "Editor de código",
+                "category": "Desarrollo"
+            },
+            "sublime": {
+                "name": "Sublime Text",
+                "icon": "✨",
+                "command": "subl",
+                "description": "Editor de texto",
+                "category": "Desarrollo"
+            },
+            "vim": {
+                "name": "Vim",
+                "icon": "⚡",
+                "command": "gvim",
+                "description": "Editor de texto",
+                "category": "Desarrollo"
+            },
+            "nano": {
+                "name": "Nano",
+                "icon": "📝",
+                "command": "nano",
+                "description": "Editor simple",
+                "category": "Desarrollo"
+            },
+            "geany": {
+                "name": "Geany",
+                "icon": "🔧",
+                "command": "geany",
+                "description": "IDE ligero",
+                "category": "Desarrollo"
+            },
+            "intellij": {
+                "name": "IntelliJ IDEA",
+                "icon": "🧠",
+                "command": "idea",
+                "description": "IDE Java",
+                "category": "Desarrollo"
+            },
+            "pycharm": {
+                "name": "PyCharm",
+                "icon": "🐍",
+                "command": "pycharm",
+                "description": "IDE Python",
+                "category": "Desarrollo"
+            },
+            
+            # Multimedia
+            "vlc": {
+                "name": "VLC",
+                "icon": "🎬",
+                "command": "vlc",
+                "description": "Reproductor multimedia",
+                "category": "Multimedia"
+            },
+            "gimp": {
+                "name": "GIMP",
+                "icon": "🎨",
+                "command": "gimp",
+                "description": "Editor de imágenes",
+                "category": "Multimedia"
+            },
+            "obs": {
+                "name": "OBS Studio",
+                "icon": "🎥",
+                "command": "obs",
+                "description": "Grabación y streaming",
+                "category": "Multimedia"
+            },
+            "audacity": {
+                "name": "Audacity",
+                "icon": "🔊",
+                "command": "audacity",
+                "description": "Editor de audio",
+                "category": "Multimedia"
+            },
+            "spotify": {
+                "name": "Spotify",
+                "icon": "🎵",
+                "command": "spotify",
+                "description": "Música en streaming",
+                "category": "Multimedia"
+            },
+            "inkscape": {
+                "name": "Inkscape",
+                "icon": "🖼️",
+                "command": "inkscape",
+                "description": "Editor vectorial",
+                "category": "Multimedia"
+            },
+            "blender": {
+                "name": "Blender",
+                "icon": "🎭",
+                "command": "blender",
+                "description": "Modelado 3D",
+                "category": "Multimedia"
+            },
+            
+            # Comunicación
+            "discord": {
+                "name": "Discord",
+                "icon": "💬",
+                "command": "discord",
+                "description": "Chat y videollamadas",
+                "category": "Comunicación"
+            },
+            "telegram": {
+                "name": "Telegram",
+                "icon": "✈️",
+                "command": "telegram-desktop",
+                "description": "Mensajería",
+                "category": "Comunicación"
+            },
+            "thunderbird": {
+                "name": "Thunderbird",
+                "icon": "📧",
+                "command": "thunderbird",
+                "description": "Cliente de email",
+                "category": "Comunicación"
+            },
+            "skype": {
+                "name": "Skype",
+                "icon": "📞",
+                "command": "skypeforlinux",
+                "description": "Videollamadas",
+                "category": "Comunicación"
+            },
+            "zoom": {
+                "name": "Zoom",
+                "icon": "📹",
+                "command": "zoom",
+                "description": "Videoconferencias",
+                "category": "Comunicación"
+            },
+            "slack": {
+                "name": "Slack",
+                "icon": "💼",
+                "command": "slack",
+                "description": "Colaboración en equipo",
+                "category": "Comunicación"
+            },
+            
+            # Herramientas del Sistema
+            "flameshot": {
+                "name": "Flameshot",
+                "icon": "📸",
+                "command": "flameshot gui",
+                "description": "Captura de pantalla",
+                "category": "Sistema"
+            },
+            "htop": {
+                "name": "htop",
+                "icon": "📊",
+                "command": "gnome-terminal -- htop",
+                "description": "Monitor del sistema",
+                "category": "Sistema"
+            },
+            "neofetch": {
+                "name": "Neofetch",
+                "icon": "💾",
+                "command": "gnome-terminal -- neofetch",
+                "description": "Info del sistema",
+                "category": "Sistema"
+            },
+            "gparted": {
+                "name": "GParted",
+                "icon": "💿",
+                "command": "gparted",
+                "description": "Editor de particiones",
+                "category": "Sistema"
+            },
+            "synaptic": {
+                "name": "Synaptic",
+                "icon": "📦",
+                "command": "synaptic",
+                "description": "Gestor de paquetes",
+                "category": "Sistema"
+            },
+            
+            # Oficina
+            "libreoffice": {
+                "name": "LibreOffice",
+                "icon": "📝",
+                "command": "libreoffice",
+                "description": "Suite ofimática",
+                "category": "Oficina"
+            },
+            "writer": {
+                "name": "LibreOffice Writer",
+                "icon": "📄",
+                "command": "libreoffice --writer",
+                "description": "Procesador de texto",
+                "category": "Oficina"
+            },
+            "calc": {
+                "name": "LibreOffice Calc",
+                "icon": "📊",
+                "command": "libreoffice --calc",
+                "description": "Hoja de cálculo",
+                "category": "Oficina"
+            },
+            "impress": {
+                "name": "LibreOffice Impress",
+                "icon": "📺",
+                "command": "libreoffice --impress",
+                "description": "Presentaciones",
+                "category": "Oficina"
+            },
+            
+            # Juegos y Entretenimiento
+            "steam": {
+                "name": "Steam",
+                "icon": "🎮",
+                "command": "steam",
+                "description": "Plataforma de juegos",
+                "category": "Juegos"
+            },
+            "lutris": {
+                "name": "Lutris",
+                "icon": "🕹️",
+                "command": "lutris",
+                "description": "Gestor de juegos",
+                "category": "Juegos"
+            },
+            "minecraft": {
+                "name": "Minecraft",
+                "icon": "🧱",
+                "command": "minecraft-launcher",
+                "description": "Juego de construcción",
+                "category": "Juegos"
+            },
+            
+            # Herramientas de Seguridad (Kali Linux)
+            "wireshark": {
+                "name": "Wireshark",
+                "icon": "🦈",
+                "command": "wireshark",
+                "description": "Analizador de red",
+                "category": "Seguridad"
+            },
+            "nmap": {
+                "name": "Nmap",
+                "icon": "🗺️",
+                "command": "gnome-terminal -- nmap",
+                "description": "Escaner de red",
+                "category": "Seguridad"
+            },
+            "burpsuite": {
+                "name": "Burp Suite",
+                "icon": "🔍",
+                "command": "burpsuite",
+                "description": "Testing web",
+                "category": "Seguridad"
+            },
+            "metasploit": {
+                "name": "Metasploit",
+                "icon": "💥",
+                "command": "gnome-terminal -- msfconsole",
+                "description": "Framework exploit",
+                "category": "Seguridad"
+            },
+            "john": {
+                "name": "John the Ripper",
+                "icon": "🔓",
+                "command": "gnome-terminal -- john",
+                "description": "Crack passwords",
+                "category": "Seguridad"
+            },
+            "hashcat": {
+                "name": "Hashcat",
+                "icon": "🐱",
+                "command": "gnome-terminal -- hashcat",
+                "description": "Recovery passwords",
+                "category": "Seguridad"
+            },
+            
+            # Aplicaciones del sistema
+            "calculator": {
+                "name": "Calculadora",
+                "icon": "🧮",
+                "command": "gnome-calculator",
+                "description": "Calculadora del sistema",
+                "category": "Utilidades"
+            },
+            "files": {
+                "name": "Archivos",
+                "icon": "📁",
+                "command": "nautilus",
+                "description": "Explorador de archivos",
+                "category": "Sistema"
+            },
+            "terminal": {
+                "name": "Terminal",
+                "icon": "💻",
+                "command": "gnome-terminal",
+                "description": "Terminal del sistema",
+                "category": "Sistema"
+            },
+            "text-editor": {
+                "name": "Editor de Texto",
+                "icon": "📝",
+                "command": "gedit",
+                "description": "Editor simple",
+                "category": "Utilidades"
+            },
+            "evince": {
+                "name": "Visor de PDFs",
+                "icon": "📋",
+                "command": "evince",
+                "description": "Lector de documentos",
+                "category": "Utilidades"
+            },
+            "archive-manager": {
+                "name": "Archivador",
+                "icon": "📦",
+                "command": "file-roller",
+                "description": "Gestor de archivos",
+                "category": "Utilidades"
+            }
+        }
+    
+    def scan_installed_apps(self):
+        """Escanear aplicaciones instaladas en el sistema"""
+        # Limpiar layout
+        for i in reversed(range(self.apps_layout.count())): 
+            self.apps_layout.itemAt(i).widget().setParent(None)
+        
+        apps_db = self.create_apps_database()
+        installed_apps = []
+        not_installed_apps = []
+        
+        # Verificar qué aplicaciones están instaladas
+        for app_id, app_data in apps_db.items():
+            command_base = app_data['command'].split()[0]
+            
+            # Verificar si el comando existe
+            try:
+                import subprocess
+                result = subprocess.run(['which', command_base], 
+                                      capture_output=True, text=True)
+                is_installed = result.returncode == 0
+            except:
+                is_installed = False
+            
+            app_data_copy = app_data.copy()
+            app_data_copy['is_installed'] = is_installed
+            app_data_copy['app_id'] = app_id
+            
+            if is_installed:
+                installed_apps.append(app_data_copy)
+            else:
+                not_installed_apps.append(app_data_copy)
+        
+        # Mostrar aplicaciones instaladas primero, luego las no instaladas
+        all_apps = installed_apps + not_installed_apps
+        
+        # Agregar aplicaciones al grid
+        row, col = 0, 0
+        max_cols = 4
+        theme = self.theme_manager.get_theme(self.current_theme)
+        
+        for app_data in all_apps:
+            card = AppLauncherCard(app_data, theme)
+            card.launch_requested.connect(self.handle_app_action)
+            
+            self.apps_layout.addWidget(card, row, col)
+            
+            col += 1
+            if col >= max_cols:
+                col = 0
+                row += 1
+        
+        # Actualizar contador
+        total_apps = len(all_apps)
+        installed_count = len(installed_apps)
+        self.apps_count_label.setText(f"📱 Apps: {total_apps} total | ✅ {installed_count} instaladas")
+    
+    def handle_app_action(self, app_data):
+        """Manejar acción de abrir o instalar aplicación"""
+        if app_data['is_installed']:
+            self.launch_application(app_data)
+        else:
+            # Redirigir a la App Store para instalar
+            QMessageBox.information(
+                self, 
+                "Aplicación no instalada", 
+                f"{app_data['name']} no está instalada.\n\nVe a la sección 'Install Dependencies' para instalarla."
+            )
+    
+    def launch_application(self, app_data):
+        """Lanzar una aplicación instalada"""
+        try:
+            import subprocess
+            # Ejecutar la aplicación en segundo plano
+            subprocess.Popen(app_data['command'].split(), 
+                           stdout=subprocess.DEVNULL, 
+                           stderr=subprocess.DEVNULL)
+            
+            # Mostrar notificación de éxito
+            QMessageBox.information(
+                self, 
+                "Aplicación iniciada", 
+                f"🚀 {app_data['name']} se ha abierto correctamente."
+            )
+            
+        except Exception as e:
+            QMessageBox.warning(
+                self, 
+                "Error al abrir aplicación", 
+                f"❌ No se pudo abrir {app_data['name']}:\n{str(e)}"
+            )
+    
+    def apply_theme(self):
+        """Aplicar estilos según el tema seleccionado"""
+        theme = self.theme_manager.get_theme(self.current_theme)
+        
+        self.setStyleSheet(f"""
+            #modeWidget {{
+                background-color: {theme['bg']};
+                color: {theme['fg']};
+            }}
+            #titleFrame, #actionsFrame {{
+                background-color: {theme['terminal_bg']};
+                color: {theme['fg']};
+                border-radius: 10px;
+                border: 1px solid {theme['border_color']};
+            }}
+            #easyTitle {{
+                color: {theme['accent']};
+            }}
+            #actionButton {{
+                padding: 8px 15px;
+                border-radius: 5px;
+                font-weight: bold;
+                background-color: {theme['button_bg']};
+                color: {theme['button_fg']};
+                border: 1px solid {theme['border_color']};
+            }}
+            #actionButton:hover {{
+                background-color: {theme['button_grad_2']};
+            }}
+            #countLabel {{
+                color: {theme['status_fg']};
+            }}
+            #appsScroll {{
+                background-color: {theme['bg']};
+                border: none;
+            }}
+        """)
 
 
 class EasyWidget(QWidget):
